@@ -90,4 +90,5 @@ if __name__ == "__main__":
     with open(out_path, "w") as f:
         json.dump(data, f, indent=2)
 
-    print(f"✅ Scraping complete. Saved iPhone 14 data → {out_path}")
+    print(f"Scraping complete. Saved iPhone 14 data → {out_path}")
+
