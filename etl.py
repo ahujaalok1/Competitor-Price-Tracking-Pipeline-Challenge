@@ -92,4 +92,5 @@ if __name__ == "__main__":
     with open(today_clean, "w") as f:
         json.dump(cleaned, f, indent=2)
 
-    print(f"✅ ETL complete. Cleaned data saved → {today_clean}")
+    print(f"ETL complete. Cleaned data saved → {today_clean}")
+
