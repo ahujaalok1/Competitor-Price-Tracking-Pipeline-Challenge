@@ -1,0 +1,10 @@
+[
+  {
+    "product_name": "iPhone 14",
+    "current_price": 789.99,
+    "currency": "USD",
+    "url": "https://www.amazon.com/s?k=iPhone+14",
+    "source": "amazon_mock",
+    "timestamp": "2025-08-27T16:06:14.417796+05:30"
+  }
+]
