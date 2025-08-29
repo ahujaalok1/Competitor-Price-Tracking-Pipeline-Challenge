@@ -13,84 +13,68 @@ Steps:
 Author: Alok Ahuja - Data Engineer
 """
 
-import json, pathlib
-from datetime import datetime, timezone, timedelta
+import json
+import pandas as pd
+from datetime import datetime
+import pathlib
 
-# Define IST timezone (Amazon prices may differ across geographies, but we keep IST for consistency)
-IST = timezone(timedelta(hours=5, minutes=30))
+# Define data directory
+DATA_DIR = pathlib.Path("data")
 
-def load_json(path):
-    """
-    Utility function to safely load JSON files.
-    Returns None if file not found (e.g., on first run when no yesterday file exists).
-    """
-    try:
-        with open(path, "r") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return None
+def process_day(raw_file, prev_day_data):
+    """Process one day's raw file into cleaned format with price changes."""
+    today_str = raw_file.stem.split("_")[-1]  # extract date from filename
+    today_date = datetime.strptime(today_str, "%Y-%m-%d").date()
 
-def transform(today_data, yesterday_data):
-    """
-    Cleans and enriches today's data:
-    - Ensures prices are floats.
-    - Compares today's prices with yesterday's.
-    - Adds price change (absolute + percentage).
-    """
-    results = []
+    # Load raw data
+    with open(raw_file, "r") as f:
+        raw_data = json.load(f)
 
-    # Build dictionary for yesterday's prices for quick lookup
-    yesterday_prices = {p["product_name"]: p["current_price"] for p in yesterday_data} if yesterday_data else {}
+    cleaned_data = []
+    for record in raw_data:
+        price = float(record["current_price"]) if record["current_price"] else None
 
-    for prod in today_data:
-        price = prod.get("current_price")
-        y_price = yesterday_prices.get(prod["product_name"])
-
+        # Default changes
         price_change = None
-        pct_change = None
+        price_change_pct = None
 
-        # If both today and yesterday's price are available, compute change
-        if price is not None and y_price is not None:
-            price_change = round(price - y_price, 2)
-            if y_price != 0:
-                pct_change = round((price_change / y_price) * 100, 2)
+        # Compare with previous day if exists
+        if prev_day_data is not None:
+            prev_record = next(
+                (r for r in prev_day_data if r["product_name"] == record["product_name"]), 
+                None
+            )
+            if prev_record and prev_record["current_price"] is not None and price is not None:
+                prev_price = float(prev_record["current_price"])
+                price_change = round(price - prev_price, 2)
+                if prev_price > 0:
+                    price_change_pct = round((price - prev_price) / prev_price * 100, 2)
 
-        results.append({
-            "product_name": prod["product_name"],
+        cleaned_data.append({
+            **record,
             "current_price": price,
-            "currency": prod.get("currency", "USD"),
-            "url": prod.get("url"),
-            "source": prod.get("source"),
-            "timestamp": prod.get("timestamp"),
-            "price_change": price_change,        # Absolute change in price
-            "price_change_pct": pct_change       # Percentage change in price
+            "price_change": price_change,
+            "price_change_pct": price_change_pct
         })
-    return results
+
+    # Save cleaned file
+    output_file = DATA_DIR / f"prices_{today_date}.json"
+    with open(output_file, "w") as f:
+        json.dump(cleaned_data, f, indent=2)
+
+    print(f"Processed {raw_file.name} → {output_file.name}")
+    return cleaned_data
+
+
+def main():
+    # Loop through all raw files sorted by date
+    raw_files = sorted(DATA_DIR.glob("raw_prices_*.json"))
+    prev_day_data = None
+
+    for raw_file in raw_files:
+        prev_day_data = process_day(raw_file, prev_day_data)
+
 
 if __name__ == "__main__":
-    # Get today's and yesterday's dates
-    date_str = datetime.now(IST).strftime("%Y-%m-%d")
-    yest_str = (datetime.now(IST) - timedelta(days=1)).strftime("%Y-%m-%d")
-
-    # File paths
-    pathlib.Path("data").mkdir(exist_ok=True)
-    today_raw = f"data/raw_prices_{date_str}.json"
-    yest_clean = f"data/prices_{yest_str}.json"
-    today_clean = f"data/prices_{date_str}.json"
-
-    # Load input data
-    today_data = load_json(today_raw)
-    yesterday_data = load_json(yest_clean)
-
-    if not today_data:
-        raise Exception(f"No data found for today: {today_raw}")
-
-    # Apply transformations
-    cleaned = transform(today_data, yesterday_data)
-
-    # Save cleaned data to JSON
-    with open(today_clean, "w") as f:
-        json.dump(cleaned, f, indent=2)
-
-    print(f"ETL complete. Cleaned data saved → {today_clean}")
+    main()
 
