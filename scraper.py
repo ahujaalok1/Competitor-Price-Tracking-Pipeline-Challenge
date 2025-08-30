@@ -13,19 +13,19 @@ Features:
 Author: Alok Ahuja - Data Engineer
 """
 
-import requests, random, json, pathlib
+import requests
+import random
+import json
+from pathlib import Path
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone, timedelta
 
-# Timezone: IST (UTC+5:30)
+# IST timezone
 IST = timezone(timedelta(hours=5, minutes=30))
 
-# User-Agent pool to mimic real browsers (helps reduce blocking)
 UA_POOL = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_5) AppleWebKit/605.1.15 "
-    "(KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
     "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:117.0) Gecko/20100101 Firefox/117.0"
 ]
 
@@ -33,95 +33,100 @@ def _now_iso():
     return datetime.now(IST).isoformat()
 
 def parse_price_text(txt):
-    """Convert price string like '$1,199.99' → float"""
     if not txt:
         return None
-    clean = "".join(ch for ch in txt if ch.isdigit() or ch in ".")
+    clean = "".join(ch for ch in txt if ch.isdigit() or ch == '.')
     try:
         return float(clean)
-    except:
+    except ValueError:
         return None
 
-def scrape_product(url, fallback_name="Unknown Product", fallback_price=0.0, fallback_currency="USD"):
-    """Scrape Amazon product page for name + price."""
+# Pre-defined fallback values
+FALLBACKS = {
+    "B0FFTS7G7R": {"product_name": "Pixel 10", "current_price": 899.99, "currency": "USD"},
+    "B0DLHLRDBY": {"product_name": "Samsung A16", "current_price": 299.99, "currency": "USD"},
+    "B0F7K9LFCL": {"product_name": "Samsung Fold", "current_price": 1999.99, "currency": "USD"}
+}
+
+def scrape_product(url):
     headers = {
         "User-Agent": random.choice(UA_POOL),
         "Accept-Language": "en-US,en;q=0.9"
     }
+    asin = url.rstrip('/').split('/')[-1]
+    fallback = FALLBACKS.get(asin, {})
+    timestamp = _now_iso()
 
     try:
         resp = requests.get(url, headers=headers, timeout=20)
-        if resp.status_code != 200:
-            raise Exception(f"Status {resp.status_code}")
-    except Exception:
-        # Fallback: return mock data
+        resp.raise_for_status()
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+        name_el = soup.find("span", {"id": "productTitle"})
+        product_name = name_el.get_text(strip=True) if name_el else fallback.get("product_name", "Unknown Product")
+
+        price_el = (
+            soup.find("span", {"id": "priceblock_ourprice"}) or
+            soup.find("span", {"id": "priceblock_dealprice"}) or
+            soup.find("span", {"class": "a-price-whole"}) or
+            soup.find("span", {"class": "a-offscreen"})
+        )
+
+        if price_el and price_el.get_text(strip=True):
+            raw_price = price_el.get_text().strip()
+            price = parse_price_text(raw_price)
+            currency = ("USD" if "$" in raw_price else
+                        "INR" if "₹" in raw_price else
+                        "GBP" if "£" in raw_price else
+                        fallback.get("currency", "USD"))
+            return {
+                "product_name": product_name,
+                "current_price": price,
+                "currency": currency,
+                "url": url,
+                "source": "amazon",
+                "timestamp": timestamp
+            }
+        else:
+            raise ValueError("Price not found in HTML")
+
+    except Exception as e:
         return {
-            "product_name": fallback_name,
-            "current_price": fallback_price,
-            "currency": fallback_currency,
+            "product_name": fallback.get("product_name", "Unknown Product"),
+            "current_price": fallback.get("current_price", 0.0),
+            "currency": fallback.get("currency", "USD"),
             "url": url,
             "source": "amazon_mock",
-            "timestamp": _now_iso()
+            "timestamp": timestamp,
+            "note": f"Fallback due to error: {e}"
         }
 
-    soup = BeautifulSoup(resp.text, "html.parser")
-
-    # Product name
-    name_el = soup.find("span", {"id": "productTitle"})
-    product_name = name_el.get_text(strip=True) if name_el else fallback_name
-
-    # Price (Amazon uses multiple selectors)
-    price_el = (
-        soup.find("span", {"id": "priceblock_ourprice"}) or
-        soup.find("span", {"id": "priceblock_dealprice"}) or
-        soup.find("span", {"class": "a-price-whole"}) or
-        soup.find("span", {"class": "a-offscreen"})
-    )
-
-    price = parse_price_text(price_el.get_text()) if price_el else fallback_price
-
-    # Detect currency
-    raw_price = price_el.get_text().strip() if price_el else ""
-    currency = fallback_currency
-    if "$" in raw_price:
-        currency = "USD"
-    elif "₹" in raw_price:
-        currency = "INR"
-    elif "£" in raw_price:
-        currency = "GBP"
-
-    return {
-        "product_name": product_name,
-        "current_price": price,
-        "currency": currency,
-        "url": url,
-        "source": "amazon",
-        "timestamp": _now_iso()
-    }
-
-if __name__ == "__main__":
-    # List of product URLs
-
+def main():
     PRODUCT_URLS = [
-    "https://www.amazon.com/dp/B0FFTS7G7R",  # Pixel 10
-    "https://www.amazon.com/dp/B0F7K9LFCL",  # Samsung fold
-    "https://www.amazon.com/dp/B0DLHLRDBY",  # Samsung A16
+        "https://www.amazon.com/dp/B0FFTS7G7R",   # Pixel 10
+        "https://www.amazon.com/dp/B0F7K9LFCL",   # Samsung Fold
+        "https://www.amazon.com/dp/B0DLHLRDBY",   # Samsung A16
     ]
 
+    results = [scrape_product(url) for url in PRODUCT_URLS]
 
-    results = []
-    for url in PRODUCT_URLS:
-        data = scrape_product(url, fallback_name="Amazon Product", fallback_price=999.99)
-        results.append(data)
+    # Define and ensure the output directory
+    script_dir = Path(__file__).parent.resolve()
+    data_dir = script_dir / "data"
+    data_dir.mkdir(exist_ok=True)
 
-    # Save to JSON
-    pathlib.Path("data").mkdir(exist_ok=True)
     date_str = datetime.now(IST).strftime("%Y-%m-%d")
-    out_path = f"data/raw_prices_{date_str}.json"
+    out_path = data_dir / f"raw_prices_{date_str}.json"
 
-    with open(out_path, "w") as f:
-        json.dump(results, f, indent=2)
+    try:
+        with open(out_path, "w", encoding="utf-8") as f:
+            json.dump(results, f, indent=2)
+        print(f"Scraping complete. Saved data → {out_path}")
+    except (IOError, TypeError) as e:
+        print(f"Error writing JSON file: {e}")
 
-    print(f"Scraping complete. Saved data → {out_path}")
     for item in results:
         print(item)
+
+if __name__ == "__main__":
+    main()
