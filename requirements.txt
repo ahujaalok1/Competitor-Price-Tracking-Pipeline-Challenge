@@ -1,0 +1,13 @@
+# Web scraping dependencies
+requests==2.31.0
+beautifulsoup4==4.12.2
+
+# Data processing
+pandas==2.0.3
+
+# Dashboard & visualization
+dash==2.14.2
+plotly==5.17.0
+
+# Workflow orchestration
+apache-airflow==2.8.1
