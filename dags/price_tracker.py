@@ -40,14 +40,15 @@ with DAG(
     # Task 1: Run scraper.py (Extraction)
     scrape_task = BashOperator(
         task_id="scrape_prices",
-        bash_command="python /opt/airflow/dags/scraper.py"
+        bash_command="python /opt/airflow/scraper.py"
     )
 
     # Task 2: Run etl.py (Transformation + Load)
     etl_task = BashOperator(
         task_id="transform_load",
-        bash_command="python /opt/airflow/dags/etl.py"
+        bash_command="python /opt/airflow/etl.py"
     )
 
     # Define task dependency (scrape → etl)
     scrape_task >> etl_task
+
