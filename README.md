@@ -1,196 +1,145 @@
-# Author: Alok Ahuja – Lead Data Engineer  
+# Competitor Price Tracking Pipeline
 
-# Competitor Price Tracking Pipeline  
-
-A simple ETL pipeline to monitor daily competitor prices from Amazon.  
-Built with **Python, Apache Airflow, and Dash/Plotly**.  
+An automated pipeline to **scrape, clean, and track competitor product prices** with visualization through a dashboard.  
+Built with **Python, Apache Airflow, and Dash**.
 
 ---
 
-## Project Overview  
-The pipeline performs three key steps:  
-
-1. **Scraper (`scraper.py`)**  
-   - Extracts raw product price data from Amazon search results.  
-   - Saves as `raw_data_YYYY-MM-DD.json`.  
-
-2. **ETL (`etl.py`)**  
-   - Reads raw JSON files from the scraper.  
-   - Cleans data (converts price to float, removes missing values).  
-   - Compares with previous day's data to calculate **price changes**.  
-   - Saves structured output as `data/prices_YYYY-MM-DD.json`.  
-
-3. **Dashboard (`dashboard.py`)**  
-   - Built with **Dash + Plotly**.  
-   - Loads cleaned JSON files from the ETL step.  
-   - Provides:  
-     - **Overview table** → Today’s snapshot of prices.  
-     - **Historical trends** → Line charts for all products across multiple days.  
-     - **Explorer tab** → Interactive dropdown to view price & % change for a product.  
+## Features
+- **Web Scraping** – Collects product prices from e-commerce websites (Amazon demo).
+- **ETL Pipeline** – Extracts raw prices, transforms product details, and saves cleaned data.
+- **Price Tracking** – Computes daily changes (`price_change` and `price_change_pct`) across products.
+- **Dashboard** – Interactive web dashboard to visualize product prices and trends.
+- **Scheduling** – Automated daily execution using **Airflow DAG**.
 
 ---
 
-## Project Structure  
-- `scraper.py` → Extracts product prices (raw JSON).  
-- `etl.py` → Transforms data, calculates price changes (cleaned JSON).  
-- `dags/price_tracker.py` → Airflow DAG for daily automation.  
-- `dashboard.py` → Dashboard to view results.  
-- `data/` → Stores raw and cleaned output JSONs.  
+## Project Structure
+```
+Competitor-Price-Tracking-Pipeline-Challenge/
+│── competitor_price_tracking/
+│   ├── scraper.py        # Scrapes raw product prices
+│   ├── etl.py            # Cleans and transforms raw data
+│── dags/
+│   └── price_tracker.py  # Airflow DAG definition
+│── data/
+│   ├── raw_prices/       # Raw JSON files from scraping
+│   ├── cleaned_prices/   # Cleaned JSON files after ETL
+│── dashboard.py          # Dash-based visualization
+│── requirements.txt      # Python dependencies
+│── README.md             # Project documentation
+│── .gitignore            # Ignored files for Git
+```
 
 ---
 
-## How It Works  
-1. **Extraction** → Scrapes Amazon prices for selected products.  
-2. **Transformation** → Cleans data, calculates daily price changes.  
-3. **Loading** → Saves structured JSON.  
-4. **Orchestration** → Airflow automates daily runs.  
-5. **Visualization** → Dashboard shows price history.  
+## Setup Instructions
 
----
-
-## Setup Instructions  
-
-### 1. Clone the Repository  
+### 1. Clone the Repository
 ```bash
-git clone https://github.com/<your-username>/competitor-price-tracker.git
-cd competitor-price-tracker
-```  
+git clone https://github.com/<your-username>/Competitor-Price-Tracking-Pipeline-Challenge.git
+cd Competitor-Price-Tracking-Pipeline-Challenge
+```
 
-### 2. Create a Virtual Environment  
+### 2. Create Virtual Environment
 ```bash
 python -m venv venv
-source venv/bin/activate     # Mac/Linux
-venv\Scripts\activate        # Windows
-```  
+source venv/bin/activate   # Linux/Mac
+venv\Scripts\activate      # Windows
+```
 
-### 3. Install Dependencies  
+### 3. Install Dependencies
 ```bash
 pip install -r requirements.txt
-```  
-
-If `requirements.txt` is missing:  
-```bash
-pip install requests beautifulsoup4 pandas dash plotly apache-airflow
-```  
-
-### 4. Start Airflow (for orchestration)  
-```bash
-airflow db init
-airflow users create \\
-    --username admin \\
-    --password admin \\
-    --firstname Data \\
-    --lastname Engineer \\
-    --role Admin \\
-    --email admin@example.com
 ```
-
-**Start scheduler and webserver:**  
-```bash
-airflow scheduler &
-airflow webserver -p 8080
-```
-
-Airflow UI → `http://127.0.0.1:8080`  
 
 ---
 
-## How to Run the Pipeline and Dashboard  
+## Running the Pipeline
 
-### Step 1: Run Scraper  
+### Run Airflow DAG
+Clone the repository and set up the environment:
+
 ```bash
-python scraper.py
+git clone <repo_url>
+cd Competitor-Price-Tracking-Pipeline-Challenge
+pip install -r requirements.txt
 ```
-Creates `raw_data_YYYY-MM-DD.json` in `/data`.  
 
-### Step 2: Run ETL  
+Initialize Airflow and start services:
+
 ```bash
-python etl.py
+airflow db init
+airflow webserver
+airflow scheduler
 ```
-Creates `prices_YYYY-MM-DD.json` in `/data`.  
 
-### Step 3: Orchestrate with Airflow  
-- DAG file: `dags/price_tracker.py`  
-- Airflow UI → Trigger DAG manually or let it run on schedule.  
-- Tasks:  
-  - `scrape_task` → runs scraper  
-  - `transform_task` → cleans + enriches data  
-  - `load_task` → saves to structured JSON  
-
-### Step 4: Launch Dashboard  
+### Run Dashboard
 ```bash
 python dashboard.py
 ```
-Opens at → `http://127.0.0.1:8050`  
+- Access dashboard at: [http://127.0.0.1:8050](http://127.0.0.1:8050)  
+- View daily prices, changes, and trends.
 
 ---
 
-## Expected Outputs  
+## Example Output
+- **Scraped Raw Data:** `data/raw_prices/raw_prices_2025-09-07.json`
+- **Cleaned Data:** `data/cleaned_prices/cleaned_prices_2025-09-07.json`
+- **Dashboard:** Interactive charts of product price trends.
 
-**Raw Data (`raw_data_YYYY-MM-DD.json`)**  
+---
+
+## Tech Stack
+- **Python** – Core scripting
+- **BeautifulSoup** – Web scraping
+- **Pandas** – Data cleaning & transformation
+- **Apache Airflow** – Workflow orchestration
+- **Dash / Plotly** – Interactive dashboard
+- **JSON** – Storage format for daily data
+
+---
+
+## Data Example
+
+### Raw Data (`data/raw_prices/`)
 ```json
 [
   {
-    "product_name": "iPhone 14",
-    "price": 799.99,
-    "url": "https://amazon.com/...",
-    "timestamp": "2025-08-29"
+    "product_name": "Google Pixel 10 Pro ...",
+    "current_price": 1049.0,
+    "currency": "USD",
+    "url": "https://www.amazon.com/dp/B0FFTS7G7R",
+    "source": "amazon",
+    "timestamp": "2025-09-07T19:07:08+05:30"
   }
 ]
 ```
 
-**ETL Output (`prices_YYYY-MM-DD.json`)**  
+### Cleaned Data (`data/cleaned_prices/`)
 ```json
 [
   {
-    "product_name": "iPhone 14",
-    "current_price": 799.99,
-    "price_change": -10.0,
-    "price_change_pct": -1.24,
-    "timestamp": "2025-08-29"
+    "product_name": "Pixel 10 Pro",
+    "current_price": 1049.0,
+    "currency": "USD",
+    "price_change": 50.0,
+    "price_change_pct": 5.0,
+    "timestamp": "2025-09-07T19:07:08+05:30"
   }
 ]
 ```
 
-**Dashboard**  
-- **Table**: Today’s prices  
-- **Line Chart**: Historical prices per product  
-- **Bar Chart**: Daily % changes  
+## Future Improvements
+- Add more e-commerce sources (Flipkart, Walmart, etc.)
+- Automate dashboard refresh via Airflow.
+- Store data in a database (PostgreSQL/BigQuery) instead of JSON.
+- Add alerts for significant price drops.
 
 ---
 
-## Assumptions  
-
-- **Scraping Reliability**  
-  - Amazon may block or throttle scraping due to bot detection.  
-  - Implemented **User-Agent rotation** and `Accept-Language` headers.  
-  - Added **5–10 second delays (recommended)** to avoid blocks.  
-
-- **Fallback Mechanism**  
-  - If scraping fails (blocked, HTML changed, missing elements), the script automatically falls back to **mock values**.  
-  - Mock values are **predefined per ASIN** in the `FALLBACKS` dictionary of `scraper.py`.  
-  - Fallbacks include product name, price, and currency (e.g., Pixel 10 → $899.99).  
-
-- **Data Storage**  
-  - Each run saves data into `data/raw_prices_YYYY-MM-DD.json`.  
-  - Data is stored in **JSON** for portability; future extension can include SQLite/Postgres.  
-
-- **Products Tracked**  
-  - Currently limited to **3 products (Pixel 10, Samsung Fold, Samsung A16)**.  
-  - Can be expanded by updating the `PRODUCT_URLS` list in `scraper.py`.  
-
-- **ETL Dependencies**  
-  - ETL (`etl.py`) expects at least one valid JSON file from the scraper.  
-  - If no previous file exists → **price change defaults to 0**.  
-
-- **Airflow**  
-  - Local demo uses cron (`0 0 * * *`).  
-  - Production: use managed Airflow (AWS MWAA / GCP Composer).  
+## Author
+**Alok Ahuja**  
+Data Engineer | Software Developer | Big Data & Cloud Enthusiast  
 
 ---
-
-## Future Enhancements  
-- Deploy with **Docker + Docker Compose**  
-- Store data in **SQLite/Postgres** instead of JSON  
-- Add **CI/CD workflows** for pipeline updates  
-- Enable **CSV/JSON export** from dashboard  
